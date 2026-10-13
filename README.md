@@ -4,7 +4,7 @@
 
 A Windhawk mod for Windows 11 that shows battery charging and discharging power and estimated remaining time in the native battery icon tooltip.
 
-Experimental version: **0.2.0**. GitHub repository name: **battery-tooltip**.
+Experimental version: **0.2.1**. GitHub repository name: **battery-tooltip**.
 
 The mod keeps the existing battery icon, taskbar percentage, and click behavior. It adds no battery tray icon. English and Simplified Chinese are supported, with `W`, `h`, and `min` units. Language follows Windows by default; other Windows languages fall back to English.
 
@@ -77,6 +77,8 @@ Reopen the tooltip to apply the language change. Both languages use the same tel
 2. Run `Start.cmd` to enable the trial. Hover over the existing battery icon.
 3. Run `Rollback.cmd` to disable the mod. The script verifies that its DLL has unloaded from Explorer, then exits this project's portable Windhawk. Saved native tooltip content is restored during unloading. A failed rollback produces an error instead of reporting success.
 
+Configuration updates stage a complete file and atomically replace the INI. File-lock failures preserve the original, invalid/empty configurations are rejected, and a `.bak` file holds the previous valid configuration. Start, language, preview, and rollback scripts can read this backup if the current configuration is damaged. If neither copy is valid, `Setup.cmd` rebuilds the configuration.
+
 The trial creates no startup entry, replaces no Windows system files, and installs no additional hardware-reading driver. It does not change charge thresholds, power plans, or taskbar layout. Once rollback completes, the project directory can be removed.
 
 Alternatively, create a custom mod in an existing Windhawk installation, paste `battery-tooltip.wh.cpp`, and compile it. Use Windhawk's disable toggle to roll back that installation; the project scripts manage only the bundled portable runtime.
@@ -105,6 +107,7 @@ The `chargeTargetPercent` setting defaults to 100. Match it to an existing charg
 
 ```powershell
 python tools/test.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/ConfigTests.ps1
 python tools/build.py
 ```
 

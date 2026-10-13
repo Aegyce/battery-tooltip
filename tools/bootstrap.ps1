@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'WriteConfig.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $runtimeRoot = Join-Path $projectRoot 'runtime\windhawk'
 $installerPath = Join-Path $projectRoot 'artifacts\windhawk_setup_offline.exe'
@@ -15,5 +16,5 @@ if (-not (Test-Path -LiteralPath (Join-Path $runtimeRoot 'Compiler\bin\clang++.e
 }
 $settingsPath = Join-Path $runtimeRoot 'AppData\settings.ini'
 $settings = [IO.File]::ReadAllText($settingsPath)
-[IO.File]::WriteAllText($settingsPath,$settings.Replace('HideTrayIcon=0','HideTrayIcon=1'),[Text.UTF8Encoding]::new($false))
+Write-AtomicTextFile $settingsPath ($settings.Replace('HideTrayIcon=0','HideTrayIcon=1'))
 Write-Host 'Portable Windhawk prepared. No startup entry or hardware-reading driver was installed.'

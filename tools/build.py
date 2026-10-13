@@ -1,4 +1,4 @@
-import pathlib, subprocess, shutil, time, re
+import pathlib, subprocess, shutil, time, re, tempfile
 
 root = pathlib.Path(__file__).resolve().parent.parent
 version = (root / 'VERSION').read_text(encoding='utf-8').strip()
@@ -24,7 +24,7 @@ subprocess.run(args, cwd=compiler, check=True)
 for source, dest in [('libc++.dll','libc++.whl'), ('libunwind.dll','libunwind.whl'), ('windhawk-mod-shim.dll','windhawk-mod-shim.dll')]:
     shutil.copy2(compiler / 'x86_64-w64-mingw32/bin' / source, out / dest)
 mods = out.parent
-(mods / 'local@battery-tooltip.ini').write_text('''[Mod]
+config = '''[Mod]
 LibraryFileName=PLACEHOLDER
 Disabled=1
 LoggingEnabled=1
@@ -37,7 +37,16 @@ Version=VERSION_PLACEHOLDER
 language=auto
 previewMode=0
 chargeTargetPercent=100
-'''.replace('VERSION_PLACEHOLDER',version).replace('PLACEHOLDER',filename), encoding='utf-8')
+'''.replace('VERSION_PLACEHOLDER',version).replace('PLACEHOLDER',filename)
+with tempfile.NamedTemporaryFile(mode='w',encoding='utf-8',suffix='.tmp',dir=mods,delete=False) as staged:
+    staged.write(config)
+    staged_path = pathlib.Path(staged.name)
+try:
+    subprocess.run(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',
+        str(root/'tools/SaveConfig.ps1'),'-Path',str(mods/'local@battery-tooltip.ini'),
+        '-Source',str(staged_path)],check=True)
+finally:
+    staged_path.unlink(missing_ok=True)
 sources = runtime / 'AppData/ModsSource'
 sources.mkdir(parents=True, exist_ok=True)
 shutil.copy2(root / 'battery-tooltip.wh.cpp', sources / 'local@battery-tooltip.wh.cpp')

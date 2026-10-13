@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'WriteConfig.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $path = Join-Path $projectRoot 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini'
-$text = [IO.File]::ReadAllText($path)
+$text = Read-ModConfig $path
 $text = [regex]::Replace($text,'(?m)^previewMode=\d+',"previewMode=$Mode")
 $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
 $previous = [regex]::Match($text,'(?m)^SettingsChangeTime=(\d+)').Groups[1].Value

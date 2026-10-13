@@ -4,7 +4,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $projectRoot 'runtime\windhawk\windhawk.exe'
 $iniPath = Join-Path $projectRoot 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini'
 if (Test-Path -LiteralPath $iniPath) {
-    $text = [IO.File]::ReadAllText($iniPath)
+    $text = Read-ModConfig $iniPath
     Write-ModConfig $iniPath ($text.Replace('Disabled=0','Disabled=1'))
     $deadline = (Get-Date).AddSeconds(15)
     do {

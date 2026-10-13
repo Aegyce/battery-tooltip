@@ -18,6 +18,9 @@ jobs:
       - name: Test formatting and edge cases
         shell: pwsh
         run: python tools/test.py
+      - name: Test configuration writes and recovery
+        shell: powershell
+        run: ./tests/ConfigTests.ps1
       - name: Compile mod
         shell: pwsh
         run: python tools/build.py

@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'WriteConfig.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $path = Join-Path $projectRoot 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini'
-$text = [IO.File]::ReadAllText($path)
+$text = Read-ModConfig $path
 if ($text -match '(?m)^language=') {
     $text = [regex]::Replace($text,'(?m)^language=.+',"language=$Language")
 } else { $text = $text.Replace('[Settings]',"[Settings]`nlanguage=$Language") }
