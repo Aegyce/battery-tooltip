@@ -1,0 +1,8 @@
+artifacts/
+runtime/
+*.pdb
+*.obj
+*.exe
+*.dll
+__pycache__/
+*.pyc
