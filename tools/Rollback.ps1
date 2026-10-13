@@ -1,10 +1,11 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'WriteConfig.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $exe = Join-Path $projectRoot 'runtime\windhawk\windhawk.exe'
 $iniPath = Join-Path $projectRoot 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini'
 if (Test-Path -LiteralPath $iniPath) {
     $text = [IO.File]::ReadAllText($iniPath)
-    [IO.File]::WriteAllText($iniPath, $text.Replace('Disabled=0','Disabled=1'), [Text.UTF8Encoding]::new($false))
+    Write-ModConfig $iniPath ($text.Replace('Disabled=0','Disabled=1'))
     $deadline = (Get-Date).AddSeconds(15)
     do {
         $loaded = @(Get-Process explorer -ErrorAction SilentlyContinue | ForEach-Object {

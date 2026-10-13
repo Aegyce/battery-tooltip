@@ -34,6 +34,7 @@ Exclude=
 Architecture=x86-64
 Version=VERSION_PLACEHOLDER
 [Settings]
+language=auto
 previewMode=0
 chargeTargetPercent=100
 '''.replace('VERSION_PLACEHOLDER',version).replace('PLACEHOLDER',filename), encoding='utf-8')

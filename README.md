@@ -4,11 +4,30 @@
 
 A Windhawk mod for Windows 11 that shows battery charging and discharging power and estimated remaining time in the native battery icon tooltip.
 
-Experimental version: **0.1.0**. GitHub repository name: **battery-tooltip**.
+Experimental version: **0.2.0**. GitHub repository name: **battery-tooltip**.
 
-The mod keeps the existing battery icon, taskbar percentage, and click behavior. It adds no battery tray icon. The current tooltip text is in Chinese, with `W`, `h`, and `min` units.
+The mod keeps the existing battery icon, taskbar percentage, and click behavior. It adds no battery tray icon. English and Simplified Chinese are supported, with `W`, `h`, and `min` units. Language follows Windows by default; other Windows languages fall back to English.
 
 ## Tooltip examples
+
+English:
+
+```text
+AC power
+Charging 18.5 W · Remaining 40 min
+```
+
+```text
+AC power
+Discharging 8.2 W · Remaining 5 h 20 min
+```
+
+```text
+AC power
+Battery idle
+```
+
+Simplified Chinese:
 
 External power with an idle battery:
 
@@ -32,6 +51,18 @@ Discharging while plugged in:
 ```
 
 On battery power, the first line reads `电池供电`. Power-source detection is independent of the battery's net charging or discharging direction. A negative battery rate is shown as discharging even when external power is connected.
+
+## Language selection
+
+In the mod settings, choose **Follow Windows**, **English**, or **简体中文**. For the portable runtime, use:
+
+```powershell
+& .\tools\Language.ps1 -Language en
+& .\tools\Language.ps1 -Language zh-CN
+& .\tools\Language.ps1 -Language auto
+```
+
+Reopen the tooltip to apply the language change. Both languages use the same telemetry and estimate rules.
 
 ## What the readings mean
 

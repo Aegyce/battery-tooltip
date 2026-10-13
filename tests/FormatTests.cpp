@@ -28,6 +28,16 @@ int main() {
     Snapshot unavailable{99,true,0,false,0,-1};
     ApplyRate(unavailable,true,std::numeric_limits<int>::min());
     check(!unavailable.rateKnown, "unknown-rate sentinel is not a watt reading");
+    check(ResolveLanguage(L"auto",0x0804) == Language::Chinese, "auto Simplified Chinese");
+    check(ResolveLanguage(L"auto",0x0409) == Language::English, "auto English");
+    check(ResolveLanguage(L"auto",0x040c) == Language::English, "unsupported language falls back to English");
+    check(ResolveLanguage(L"en",0x0804) == Language::English, "English override on Chinese Windows");
+    check(ResolveLanguage(L"zh-CN",0x0409) == Language::Chinese, "Chinese override on English Windows");
+    check(Format({99,true,0,true,0,-1},Language::English) == L"AC power\nBattery idle", "English idle");
+    check(Format({75,true,1,true,18.5,2400},Language::English) == L"AC power\nCharging 18.5 W · Remaining 40 min", "English charging");
+    check(Format({75,false,2,true,8.2,19200},Language::English) == L"Battery power\nDischarging 8.2 W · Remaining 5 h 20 min", "English discharge");
+    check(Format({75,true,2,true,8.2,19200},Language::English) == L"AC power\nDischarging 8.2 W · Remaining 5 h 20 min", "English discharge on AC");
+    check(Format({75,false,2,false,0,-1},Language::English) == L"Battery power\nDischarging -- W · Remaining --", "English unknown telemetry");
     std::cout << checked << " checks, " << failed << " failures\n";
     return failed ? 1 : 0;
 }

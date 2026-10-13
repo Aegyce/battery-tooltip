@@ -2,7 +2,7 @@
 // @id              battery-tooltip
 // @name            Battery Tooltip
 // @description     A Windhawk mod for Windows 11 that shows battery charging and discharging power and estimated remaining time in the native battery icon tooltip.
-// @version         0.1.0
+// @version         0.2.0
 // @author          Aegyce
 // @license         MIT
 // @include         explorer.exe
@@ -19,11 +19,19 @@ can increase as charging slows near full. Missing telemetry is shown as --.
 Disable this mod to restore saved native tooltip content. No system DLLs,
 battery charge thresholds, taskbar layout, or power settings are changed.
 Preview modes use sample data; switch back to live after viewing.
+Language follows Windows by default. English and Simplified Chinese can also
+be selected explicitly in the mod settings.
 */
 // ==/WindhawkModReadme==
 
 // ==WindhawkModSettings==
 /*
+- language: auto
+  $name: Language / 语言
+  $options:
+  - auto: Follow Windows / 跟随系统
+  - en: English
+  - zh-CN: 简体中文
 - previewMode: 0
   $name: Preview mode
   $options:
@@ -32,7 +40,7 @@ Preview modes use sample data; switch back to live after viewing.
   - 2: Discharging sample (not real telemetry)
 - chargeTargetPercent: 100
   $name: Charging target (%)
-  $description: Match your configured Lenovo charge limit for the time estimate.
+  $description: Match your configured battery charge limit for the time estimate.
 */
 // ==/WindhawkModSettings==
 
@@ -42,6 +50,17 @@ Preview modes use sample data; switch back to live after viewing.
 #include <cwchar>
 #include <string>
 #include <vector>
+#include <cstdint>
+
+enum class Language { Chinese, English };
+
+Language ResolveLanguage(const std::wstring& setting, uint16_t uiLanguage) {
+    if (setting == L"zh-CN") return Language::Chinese;
+    if (setting == L"en" || setting == L"en-US") return Language::English;
+    // LANG_CHINESE = 0x04; the low 10 bits identify the primary language.
+    return (uiLanguage & 0x3ff) == 0x04 ? Language::Chinese : Language::English;
+}
+
 #ifndef BATTERY_TOOLTIP_TEST
 #include <windhawk_api.h>
 #include <windhawk_utils.h>
@@ -61,6 +80,7 @@ std::atomic<bool> g_stopping{false};
 std::atomic<int> g_preview{0};
 std::atomic<int> g_target{100};
 std::atomic<int> g_openCount{0};
+std::atomic<Language> g_language{Language::English};
 UINT g_restoreMessage;
 HWND g_taskbar;
 #endif
@@ -97,17 +117,20 @@ std::wstring FormatDuration(double seconds) {
     return result;
 }
 
-std::wstring Format(const Snapshot& s) {
-    std::wstring source = s.ac ? L"外接电源" : L"电池供电";
-    if (!s.state) return source + L"\n电池未充放电";
+std::wstring Format(const Snapshot& s, Language language = Language::Chinese) {
+    bool english = language == Language::English;
+    std::wstring source = english ? (s.ac ? L"AC power" : L"Battery power")
+                                  : (s.ac ? L"外接电源" : L"电池供电");
+    if (!s.state) return source + (english ? L"\nBattery idle" : L"\n电池未充放电");
     std::wstring text = source + L"\n";
-    text += s.state == 1 ? L"充电 " : L"放电 ";
+    text += english ? (s.state == 1 ? L"Charging " : L"Discharging ")
+                    : (s.state == 1 ? L"充电 " : L"放电 ");
     if (s.rateKnown) {
         wchar_t value[32];
         swprintf_s(value, L"%.1f W", s.watts);
         text += value;
     } else text += L"-- W";
-    return text + L" · 剩余 " + FormatDuration(s.seconds);
+    return text + (english ? L" · Remaining " : L" · 剩余 ") + FormatDuration(s.seconds);
 }
 
 #ifndef BATTERY_TOOLTIP_TEST
@@ -187,11 +210,13 @@ void WINAPI OpenedHook(void* self, const IInspectable& sender, const RoutedEvent
         auto content = tooltip.Content();
         Wh_SetStringValue(L"originalContentType", content ? get_class_name(content).c_str() : L"null");
         Wh_SetIntValue(L"isOpen", tooltip.IsOpen());
-        std::wstring text = Format(ReadBattery());
+        auto language = g_language.load();
+        std::wstring text = Format(ReadBattery(), language);
         auto replacement = box_value(hstring(text));
         g_saved.push_back({make_weak(tooltip), content, replacement});
         tooltip.Content(replacement);
         Wh_SetStringValue(L"lastTooltip", text.c_str());
+        Wh_SetStringValue(L"lastLanguage", language == Language::English ? L"en" : L"zh-CN");
         Wh_SetStringValue(L"lastError", L"");
     } catch (const hresult_error& error) {
         Wh_SetStringValue(L"lastError", error.message().c_str());
@@ -207,6 +232,9 @@ LRESULT CALLBACK RestoreHook(int code, WPARAM wParam, LPARAM lParam) {
 }
 
 void ReadSettings() {
+    auto language = Wh_GetStringSetting(L"language");
+    g_language = ResolveLanguage(language ? language : L"auto", GetUserDefaultUILanguage());
+    if (language) Wh_FreeStringSetting(language);
     g_preview = std::clamp(Wh_GetIntSetting(L"previewMode"), 0, 2);
     g_target = std::clamp(Wh_GetIntSetting(L"chargeTargetPercent"), 1, 100);
 }
@@ -220,7 +248,7 @@ BOOL Wh_ModInit() {
     auto module = GetModuleHandleW(L"SystemTray.dll");
     if (!module) return FALSE;
     ReadSettings();
-    g_restoreMessage = RegisterWindowMessageW(L"BatteryTooltip.Restore.0.1");
+    g_restoreMessage = RegisterWindowMessageW(L"BatteryTooltip.Restore");
     // Use the exact ABI name discovered on this system if undecorated names differ.
     WH_FIND_SYMBOL_OPTIONS options{sizeof(options)};
     options.noUndecoratedSymbols = TRUE;
