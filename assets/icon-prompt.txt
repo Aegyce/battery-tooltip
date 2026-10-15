@@ -1,0 +1,7 @@
+Generation: built-in image_gen tool; transparent background.
+Original asset: battery-tooltip.png
+Windows multi-resolution encoding: battery-tooltip.ico (16, 20, 24, 32, 40, 48, 64, 128, 256 px).
+Icon applies to the management window and its Start menu shortcut.
+
+Prompt:
+Use case: logo-brand. Asset type: Windows application icon for Battery Tooltip, a compact battery-status management utility. Create one finished square icon on a genuinely transparent background. A clean modern emerald-green battery silhouette with a small overlapping white tooltip speech bubble, both bold and geometrically simple, subtle depth and gentle rounded edges. Strong readable silhouette at 16px and 32px, no tiny details. Centered composition, icon fills most of the square with modest safe padding. No words, letters, numbers, watermark, UI mockup, sample grid, or surrounding scene. Only the application icon. Preserve transparent alpha.

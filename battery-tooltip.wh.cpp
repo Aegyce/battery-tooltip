@@ -2,7 +2,7 @@
 // @id              battery-tooltip
 // @name            Battery Tooltip
 // @description     A Windhawk mod for Windows 11 that shows battery charging and discharging power and estimated remaining time in the native battery icon tooltip.
-// @version         1.0.0
+// @version         1.1.0
 // @author          Aegyce
 // @license         MIT
 // @include         explorer.exe

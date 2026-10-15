@@ -1,0 +1,12 @@
+{
+  "en": {
+    "running": "Running", "stopped": "Stopped", "starting": "Working...",
+    "startup": "Start automatically at sign-in", "start": "Start", "restart": "Restart",
+    "stop": "Stop", "uninstall": "Uninstall", "close": "Close", "failed": "Operation failed. See artifacts/manager-error.log."
+  },
+  "zh": {
+    "running": "正在运行", "stopped": "已停止", "starting": "正在处理…",
+    "startup": "登录时自动启动", "start": "启动", "restart": "重启",
+    "stop": "停止", "uninstall": "卸载", "close": "关闭", "failed": "操作失败，请查看 artifacts/manager-error.log。"
+  }
+}

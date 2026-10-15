@@ -8,10 +8,10 @@ if ($library -notmatch ('^battery-tooltip_' + [regex]::Escape($version) + '_\d+\
 $package = Join-Path $root ('artifacts\package-' + [Guid]::NewGuid().ToString('N'))
 $precompiled = Join-Path $package 'Precompiled'
 New-Item -ItemType Directory -Path $precompiled -Force | Out-Null
-foreach ($name in @('battery-tooltip.wh.cpp','README.md','LICENSE','VERSION','Setup.cmd','Install.cmd','Start.cmd','Rollback.cmd','Status.cmd')) {
+foreach ($name in @('battery-tooltip.wh.cpp','README.md','LICENSE','VERSION','Setup.cmd','Install.cmd','Manage.cmd','Start.cmd','Restart.cmd','Rollback.cmd','Status.cmd','Uninstall.cmd')) {
     Copy-Item -LiteralPath (Join-Path $root $name) -Destination $package
 }
-foreach ($name in @('tools','tests')) { Copy-Item -LiteralPath (Join-Path $root $name) -Destination $package -Recurse }
+foreach ($name in @('tools','tests','assets')) { Copy-Item -LiteralPath (Join-Path $root $name) -Destination $package -Recurse }
 $entries = foreach ($name in @($library,'libc++.whl','libunwind.whl','windhawk-mod-shim.dll')) {
     $file = Join-Path $root "runtime\windhawk\AppData\Engine\Mods\64\$name"
     Copy-Item -LiteralPath $file -Destination $precompiled

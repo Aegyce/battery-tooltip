@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\tools\StartupConfig.ps1')
 . (Join-Path $PSScriptRoot '..\tools\WriteConfig.ps1')
 . (Join-Path $PSScriptRoot '..\tools\InstallPackage.ps1')
+. (Join-Path $PSScriptRoot '..\tools\Menu.ps1')
 $script:checks = 0
 function Check([bool]$Condition,[string]$Name) {
     if (-not $Condition) { throw "FAILED: $Name" }
@@ -69,6 +70,22 @@ try {
     $failed = $false
     try { Install-BatteryTooltipPackage $rootA } catch { $failed = $true }
     Check ($failed) 'reject manifest path traversal'
+    $menu = Join-Path $fixture 'Start menu'
+    Check (Set-BatteryTooltipMenu $rootA Enable $menu) 'install manager shortcut'
+    Check (@(Get-ChildItem -LiteralPath $menu -Filter '*.lnk').Count -eq 1) 'one Start menu entry covers all controls'
+    $link = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $menu 'Battery Tooltip.lnk'))
+    Check ($link.Arguments.Contains(('"{0}"' -f (Join-Path $rootA 'tools\Manage.ps1'))) -and $link.Arguments -match '-STA -WindowStyle Hidden') 'manager shortcut quotes paths and hides the console'
+    Check (Set-BatteryTooltipMenu $rootA Status $menu) 'manager shortcut ownership detected'
+    $failed = $false
+    try { Set-BatteryTooltipMenu $rootB Enable $menu | Out-Null } catch { $failed = $true }
+    Check ($failed) 'another directory cannot replace the manager entry'
+    Set-BatteryTooltipMenu $rootB Disable $menu | Out-Null
+    Check (Set-BatteryTooltipMenu $rootA Status $menu) 'another directory cannot delete the manager entry'
+    $marker = Join-Path $menu 'unrelated.txt'
+    [IO.File]::WriteAllText($marker,'preserve')
+    Set-BatteryTooltipMenu $rootA Disable $menu | Out-Null
+    Check (-not (Set-BatteryTooltipMenu $rootA Status $menu)) 'uninstall removes the owned manager shortcut'
+    Check (Test-Path -LiteralPath $marker) 'uninstall preserves unrelated menu files'
     Write-Host "$script:checks installation checks passed."
 } finally {
     if (Test-Path -LiteralPath $registry) { Remove-Item -LiteralPath $registry }

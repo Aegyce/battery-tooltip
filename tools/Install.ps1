@@ -16,4 +16,6 @@ if (Test-Path -LiteralPath (Join-Path $projectRoot 'Precompiled\manifest.json'))
 }
 if (-not $NoStart) { & (Join-Path $PSScriptRoot 'Start.ps1') }
 if (-not $NoAutoStart) { & (Join-Path $PSScriptRoot 'Startup.ps1') -Mode Enable }
-Write-Host 'Battery Tooltip installation complete. Use Status.cmd to inspect it or Rollback.cmd to stop it and remove startup.'
+. (Join-Path $PSScriptRoot 'Menu.ps1')
+Set-BatteryTooltipMenu $projectRoot Enable | Out-Null
+Write-Host 'Battery Tooltip installed. Search the Start menu for Battery Tooltip to open its compact manager.'

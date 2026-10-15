@@ -4,6 +4,8 @@ using System;
 using System.Runtime.InteropServices;
 namespace BatteryTooltip {
     public static class NativeTaskbar {
+        [DllImport("kernel32.dll")]
+        public static extern ushort GetUserDefaultUILanguage();
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         public static extern IntPtr FindWindow(string className, string windowName);
         [DllImport("user32.dll")]
