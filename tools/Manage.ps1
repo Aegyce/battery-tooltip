@@ -22,11 +22,13 @@ $actionButton = $window.FindName('ActionButton')
 $stopButton = $window.FindName('StopButton')
 $uninstallButton = $window.FindName('UninstallButton')
 $closeButton = $window.FindName('CloseButton')
+$updateButton = $window.FindName('UpdateButton')
 $errorLabel = $window.FindName('ErrorLabel')
 $startupCheck.Content = $strings.startup
 $stopButton.Content = $strings.stop
 $uninstallButton.Content = $strings.uninstall
 $closeButton.Content = $strings.close
+$updateButton.Content = $strings.update
 $script:refreshing = $false
 $script:operation = $null
 $script:closeAfterOperation = $false
@@ -63,8 +65,8 @@ function Start-ManagerOperation([string]$ScriptName,[string]$Arguments = '',[boo
     try {
         $script:operation = Start-BatteryTooltipManagerProcess (Join-Path $PSScriptRoot $ScriptName) $Arguments $logDirectory
         $script:closeAfterOperation = $CloseAfter
-        foreach ($control in @($startupCheck,$actionButton,$stopButton,$uninstallButton)) { $control.IsEnabled = $false }
-        $stateLabel.Text = $strings.starting
+        foreach ($control in @($startupCheck,$actionButton,$stopButton,$uninstallButton,$updateButton)) { $control.IsEnabled = $false }
+        $stateLabel.Text = if ($ScriptName -eq 'Update.ps1') { $strings.updateChecking } else { $strings.starting }
         $errorLabel.Visibility = 'Collapsed'
     } catch {
         $errorLabel.Text = $_.Exception.Message
@@ -76,6 +78,7 @@ $actionButton.Add_Click({ Start-ManagerOperation 'Restart.ps1' })
 $stopButton.Add_Click({ Start-ManagerOperation 'Rollback.ps1' '-KeepAutoStart' })
 $uninstallButton.Add_Click({ Start-ManagerOperation 'Uninstall.ps1' '' $true })
 $closeButton.Add_Click({ $window.Close() })
+$updateButton.Add_Click({ Start-ManagerOperation 'Update.ps1' })
 $startupChanged = {
     if (-not $script:refreshing) {
         $mode = if ($startupCheck.IsChecked) { 'Enable' } else { 'Disable' }
@@ -94,7 +97,7 @@ $timer.Add_Tick({
         $script:operation.Dispose()
         $script:operation = $null
         if ($success -and $script:closeAfterOperation) { $window.Close(); return }
-        foreach ($control in @($startupCheck,$actionButton,$stopButton,$uninstallButton)) { $control.IsEnabled = $true }
+        foreach ($control in @($startupCheck,$actionButton,$stopButton,$uninstallButton,$updateButton)) { $control.IsEnabled = $true }
         if (-not $success) { $errorLabel.Text = $strings.failed; $errorLabel.Visibility = 'Visible' }
     }
     Update-ManagerStatus

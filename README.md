@@ -4,7 +4,7 @@
 
 A Windhawk mod for Windows 11 that shows battery charging and discharging power and estimated remaining time in the native battery icon tooltip.
 
-Stable release: **1.1.0**. GitHub repository name: **battery-tooltip**.
+Stable release: **1.2.0**. GitHub repository name: **battery-tooltip**.
 
 The mod keeps the existing battery icon, taskbar percentage, and click behavior. It adds no battery tray icon. English and Simplified Chinese are supported, with `W`, `h`, and `min` units. Language follows Windows by default; other Windows languages fall back to English.
 
@@ -73,7 +73,7 @@ Reopen the tooltip to apply the language change. Both languages use the same tel
 
 ## Install, start, and stop
 
-1. Download `BatteryTooltip-1.1.0.zip` from [GitHub Releases](https://github.com/Aegyce/battery-tooltip/releases/latest), extract it to a permanent directory, and run `Install.cmd` (or `Setup.cmd`). The package includes the compiled mod and dependencies; Python is not required. Setup downloads and verifies the official Windhawk 1.7.3 offline installer and extracts the portable runtime.
+1. Download `BatteryTooltip-1.2.0.zip` from [GitHub Releases](https://github.com/Aegyce/battery-tooltip/releases/latest), extract it to a permanent directory, and run `Install.cmd` (or `Setup.cmd`). The package includes the compiled mod and dependencies; Python is not required. Setup downloads and verifies the official Windhawk 1.7.3 offline installer and extracts the portable runtime.
 2. Installation starts the mod, verifies that its tooltip hook is ready, and enables automatic startup for the current Windows user. Hover over the existing battery icon. Keep the installation directory in place.
 3. Search the Start menu for **Battery Tooltip** (or run `Manage.cmd`). One compact window shows running status, a sign-in startup checkbox, and Start/Restart, Stop, Uninstall, and Close buttons. Restart and Stop preserve the automatic-startup preference. Close dismisses only the manager; the tooltip keeps running. The window is 308 logical pixels wide, with an 8-pixel margin and 4-pixel button spacing. Its application icon is also used for the single Start menu entry.
 4. Uninstall from that window (or run `Uninstall.cmd`) to stop the mod and remove this installation's startup and Start menu entry. `Rollback.cmd` stops the mod and removes startup while keeping the manager available. Both verify DLL unloading and restore saved native tooltip content. A failed stop produces an error instead of reporting success.
@@ -99,6 +99,16 @@ Configuration updates stage a complete file and atomically replace the INI. File
 Automatic startup uses one current-user `Run` registry entry; the scripts do not overwrite or remove an entry owned by another installation directory. No Windows system files are replaced and no additional hardware-reading driver is installed. Charge thresholds, power plans, and taskbar layout are preserved. Once uninstallation completes, the project directory can be removed.
 
 Alternatively, create a custom mod in an existing Windhawk installation, paste `battery-tooltip.wh.cpp`, and compile it. Use Windhawk's disable toggle to roll back that installation; the project scripts manage only the bundled portable runtime.
+
+## Check for updates
+
+Use **Check updates** beside the automatic-startup checkbox. It checks the latest stable release from `Aegyce/battery-tooltip`; it does not check automatically at launch. If a newer version is available, a dialog shows both versions and asks whether to download and install it. Choosing No downloads nothing.
+
+After confirmation, the updater downloads and verifies the package, closes the manager, stops the mod, installs the new version, and reopens the manager. Language, preview mode, charge target, automatic startup, and whether the mod was running are preserved. Failed installation attempts restore the previous application files and mod configuration.
+
+ZIP files, extracted files, the temporary worker, and the temporary rollback snapshot live in a uniquely owned directory under `artifacts/update-cache` and are removed after success or failure. Interrupted updates are cleaned at the next update check after their worker exits. If automatic recovery itself fails, a separate recovery backup is retained under `artifacts/update-recovery`; the temporary download directory is still cleaned. Update logs stay at `artifacts/update.log`.
+
+The updater manages this installation's application files and private Windhawk mod only. Updating the standalone source in another Windhawk installation remains that installation's responsibility.
 
 ## Compatibility
 
@@ -127,6 +137,7 @@ python tools/test.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/ConfigTests.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/InstallTests.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/ManagerProcessTests.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/UpdateTests.ps1
 python tools/build.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Package.ps1
 ```

@@ -2,11 +2,17 @@
   "en": {
     "running": "Running", "stopped": "Stopped", "starting": "Working...",
     "startup": "Start automatically at sign-in", "start": "Start", "restart": "Restart",
-    "stop": "Stop", "uninstall": "Uninstall", "close": "Close", "failed": "Operation failed. See artifacts/manager-error.log."
+    "stop": "Stop", "uninstall": "Uninstall", "close": "Close", "failed": "Operation failed. See artifacts/manager-error.log.",
+    "update": "Check updates", "updateChecking": "Checking for updates...", "updateBusy": "An update is already being checked or installed.",
+    "updateLatest": "Version {0} is up to date.", "updateConfirm": "Current version: {0}\nNew version: {1}\n\nDownload and install this update?",
+    "updateError": "Could not check or install the update. See artifacts/update.log for details."
   },
   "zh": {
     "running": "正在运行", "stopped": "已停止", "starting": "正在处理…",
     "startup": "登录时自动启动", "start": "启动", "restart": "重启",
-    "stop": "停止", "uninstall": "卸载", "close": "关闭", "failed": "操作失败，请查看 artifacts/manager-error.log。"
+    "stop": "停止", "uninstall": "卸载", "close": "关闭", "failed": "操作失败，请查看 artifacts/manager-error.log。",
+    "update": "检查更新", "updateChecking": "正在检查更新…", "updateBusy": "正在检查或安装更新，请稍候。",
+    "updateLatest": "当前 {0} 已是最新版本。", "updateConfirm": "当前版本：{0}\n发现新版本：{1}\n\n是否下载并安装更新？",
+    "updateError": "检查或安装更新未完成，详情见程序目录中的 artifacts/update.log。"
   }
 }

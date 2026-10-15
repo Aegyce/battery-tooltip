@@ -27,6 +27,9 @@ jobs:
       - name: Test manager operation results and logs
         shell: powershell
         run: ./tests/ManagerProcessTests.ps1
+      - name: Test update verification, rollback, and cleanup
+        shell: powershell
+        run: ./tests/UpdateTests.ps1
       - name: Compile mod
         shell: pwsh
         run: python tools/build.py

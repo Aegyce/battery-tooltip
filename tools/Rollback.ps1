@@ -21,6 +21,7 @@ if (Test-Path -LiteralPath $iniPath) {
 }
 if (Test-Path -LiteralPath $exe) {
     $process = Start-Process -FilePath $exe -ArgumentList '-exit -wait' -WindowStyle Hidden -PassThru
+    $null = $process.Handle
     if (-not $process.WaitForExit(15000)) { throw 'Windhawk has not finished exiting. Do not delete the runtime yet.' }
     if ($process.ExitCode -ne 0) { throw "Windhawk exit failed: $($process.ExitCode)" }
 }
