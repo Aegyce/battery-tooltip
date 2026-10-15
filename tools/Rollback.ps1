@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'WriteConfig.ps1')
+. (Join-Path $PSScriptRoot 'StartupConfig.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
+Set-BatteryTooltipStartup $projectRoot Disable | Out-Null
 $exe = Join-Path $projectRoot 'runtime\windhawk\windhawk.exe'
 $iniPath = Join-Path $projectRoot 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini'
 if (Test-Path -LiteralPath $iniPath) {
@@ -21,4 +23,4 @@ if (Test-Path -LiteralPath $exe) {
     if (-not $process.WaitForExit(15000)) { throw 'Windhawk has not finished exiting. Do not delete the runtime yet.' }
     if ($process.ExitCode -ne 0) { throw "Windhawk exit failed: $($process.ExitCode)" }
 }
-Write-Host 'Trial stopped. Native battery tooltip restored. No startup entry was created.'
+Write-Host 'Battery Tooltip stopped. Native battery tooltip restored and this copy removed from startup.'

@@ -1,5 +1,6 @@
 artifacts/
 runtime/
+Precompiled/
 *.pdb
 *.obj
 *.exe

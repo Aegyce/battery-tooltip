@@ -4,7 +4,7 @@
 
 A Windhawk mod for Windows 11 that shows battery charging and discharging power and estimated remaining time in the native battery icon tooltip.
 
-Experimental version: **0.2.1**. GitHub repository name: **battery-tooltip**.
+Stable release: **1.0.0**. GitHub repository name: **battery-tooltip**.
 
 The mod keeps the existing battery icon, taskbar percentage, and click behavior. It adds no battery tray icon. English and Simplified Chinese are supported, with `W`, `h`, and `min` units. Language follows Windows by default; other Windows languages fall back to English.
 
@@ -71,21 +71,34 @@ Reopen the tooltip to apply the language change. Both languages use the same tel
 - Missing or unreasonable values appear as `--` instead of a misleading zero.
 - Data refreshes whenever the tooltip opens; an already-open tooltip does not refresh continuously.
 
-## Try it and roll back
+## Install, start, and stop
 
-1. On a new machine, install Python 3 and run `Setup.cmd`. It downloads and verifies the official Windhawk 1.7.3 offline installer, extracts a portable runtime, runs tests, and compiles the mod. The mod stays disabled after building.
-2. Run `Start.cmd` to enable the trial. Hover over the existing battery icon.
-3. Run `Rollback.cmd` to disable the mod. The script verifies that its DLL has unloaded from Explorer, then exits this project's portable Windhawk. Saved native tooltip content is restored during unloading. A failed rollback produces an error instead of reporting success.
+1. Download `BatteryTooltip-1.0.0.zip` from [GitHub Releases](https://github.com/Aegyce/battery-tooltip/releases/latest), extract it to a permanent directory, and run `Install.cmd` (or `Setup.cmd`). The package includes the compiled mod and dependencies; Python is not required. Setup downloads and verifies the official Windhawk 1.7.3 offline installer and extracts the portable runtime.
+2. Installation starts the mod, verifies that its tooltip hook is ready, and enables automatic startup for the current Windows user. Hover over the existing battery icon. Keep the installation directory in place.
+3. Run `Status.cmd` to inspect the installed version, module loading, hook readiness, and automatic startup. `Start.cmd` starts the mod manually without changing the startup preference.
+4. Run `Rollback.cmd` to remove this installation's startup entry and disable the mod. The script verifies that its DLL has unloaded from Explorer, then exits this project's portable Windhawk. Saved native tooltip content is restored during unloading. A failed rollback produces an error instead of reporting success.
+
+To install without automatic startup, run `Install.cmd -NoAutoStart`. To prepare a package without starting it, add `-NoStart`. Enable or disable automatic startup independently with:
+
+```powershell
+& .\tools\Startup.ps1 -Mode Enable
+& .\tools\Startup.ps1 -Mode Disable
+& .\tools\Startup.ps1 -Mode Status
+```
+
+Automatic startup waits up to 90 seconds for the taskbar and native tooltip hook. Startup failures are written to `artifacts/startup.log`; a failed launch is not reported as successful. Initialization supports Explorer starting before `SystemTray.dll` loads. A normal sleep/hibernate resume keeps the existing process; it does not require a separate scheduled task.
+
+Install over an existing directory to upgrade; the old module is stopped first and existing language, preview, and charge-target settings are preserved. Disable startup before moving the directory, then install from its new location.
 
 Configuration updates stage a complete file and atomically replace the INI. File-lock failures preserve the original, invalid/empty configurations are rejected, and a `.bak` file holds the previous valid configuration. Start, language, preview, and rollback scripts can read this backup if the current configuration is damaged. If neither copy is valid, `Setup.cmd` rebuilds the configuration.
 
-The trial creates no startup entry, replaces no Windows system files, and installs no additional hardware-reading driver. It does not change charge thresholds, power plans, or taskbar layout. Once rollback completes, the project directory can be removed.
+Automatic startup uses one current-user `Run` registry entry; the scripts do not overwrite or remove an entry owned by another installation directory. No Windows system files are replaced and no additional hardware-reading driver is installed. Charge thresholds, power plans, and taskbar layout are preserved. Once rollback completes, the project directory can be removed.
 
 Alternatively, create a custom mod in an existing Windhawk installation, paste `battery-tooltip.wh.cpp`, and compile it. Use Windhawk's disable toggle to roll back that installation; the project scripts manage only the bundled portable runtime.
 
 ## Compatibility
 
-The initial trial loaded on **Windows 11 25H2, build 26200.9457, x64**. The user confirmed that the modified tooltip appeared on the original battery icon and that the two-line sample fitted. Other Windows builds and real charging/discharging transitions have not yet been validated on hardware.
+The native tooltip was validated on **Windows 11 25H2, build 26200.9457, x64**. Other Windows builds have not been validated on hardware. Automated checks cover formatting, signed charge/discharge rates, atomic configuration recovery, startup ownership, and precompiled installation. Reboot/login and sleep/hibernate cycles still require hardware verification; the stable release label does not expand the tested Windows compatibility range.
 
 The mod hooks the native battery tooltip's opening handler in `SystemTray.dll`. It refuses to enable if the expected symbol cannot be found. Windows updates may require compatibility changes. Initial symbol downloads require internet access.
 
@@ -108,10 +121,14 @@ The `chargeTargetPercent` setting defaults to 100. Match it to an existing charg
 ```powershell
 python tools/test.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/ConfigTests.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/InstallTests.ps1
 python tools/build.py
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Package.ps1
 ```
 
 Run `Rollback.cmd` before rebuilding an active mod. Each build uses a new DLL filename and keeps the mod disabled until explicitly started.
+
+Installing from a source checkout without `Precompiled/manifest.json` requires Python 3 and compiles locally. Downloaded release packages use the checksummed precompiled files instead.
 
 GitHub Actions runs formatting and edge-case tests, compiles the mod, and generates a downloadable package on pushes and pull requests. A `v*` tag matching `VERSION` triggers automatic GitHub Release creation.
 

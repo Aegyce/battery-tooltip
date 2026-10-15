@@ -2,7 +2,7 @@
 // @id              battery-tooltip
 // @name            Battery Tooltip
 // @description     A Windhawk mod for Windows 11 that shows battery charging and discharging power and estimated remaining time in the native battery icon tooltip.
-// @version         0.2.1
+// @version         1.0.0
 // @author          Aegyce
 // @license         MIT
 // @include         explorer.exe
@@ -12,7 +12,7 @@
 
 // ==WindhawkModReadme==
 /*
-# Battery Tooltip (experimental)
+# Battery Tooltip
 Changes only the original battery icon's hover tooltip. No new battery icon.
 Time is an estimate. Charging time uses the current net charging rate, so it
 can increase as charging slows near full. Missing telemetry is shown as --.
@@ -82,7 +82,9 @@ std::atomic<int> g_target{100};
 std::atomic<int> g_openCount{0};
 std::atomic<Language> g_language{Language::English};
 UINT g_restoreMessage;
-HWND g_taskbar;
+std::atomic<HWND> g_taskbar{nullptr};
+std::atomic<bool> g_hookAttempted{false};
+std::atomic<bool> g_hookReady{false};
 #endif
 
 struct Snapshot {
@@ -194,6 +196,7 @@ using OpenedFn = void(WINAPI*)(void*, const IInspectable&, const RoutedEventArgs
 OpenedFn g_originalOpened;
 
 void WINAPI OpenedHook(void* self, const IInspectable& sender, const RoutedEventArgs& args) {
+    g_taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
     // Restore our old content before letting the native handler update it.
     RestoreAll();
     g_originalOpened(self, sender, args);
@@ -239,22 +242,24 @@ void ReadSettings() {
     g_target = std::clamp(Wh_GetIntSetting(L"chargeTargetPercent"), 1, 100);
 }
 
-BOOL Wh_ModInit() {
-    g_taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
-    if (!g_taskbar || GetWindowThreadProcessId(g_taskbar, nullptr) == 0) return FALSE;
-    DWORD owner;
-    GetWindowThreadProcessId(g_taskbar, &owner);
-    if (owner != GetCurrentProcessId()) return FALSE;
-    auto module = GetModuleHandleW(L"SystemTray.dll");
-    if (!module) return FALSE;
-    ReadSettings();
-    g_restoreMessage = RegisterWindowMessageW(L"BatteryTooltip.Restore");
+void MarkHookReady() {
+    g_hookReady = true;
+    Wh_SetIntValue(L"runtimeProcessId", GetCurrentProcessId());
+    Wh_SetStringValue(L"runtimeStatus", L"ready");
+    Wh_SetStringValue(L"lastError", L"");
+}
+
+bool InstallTooltipHook(HMODULE module) {
+    if (g_hookAttempted.exchange(true)) return false;
     // Use the exact ABI name discovered on this system if undecorated names differ.
     WH_FIND_SYMBOL_OPTIONS options{sizeof(options)};
     options.noUndecoratedSymbols = TRUE;
     WH_FIND_SYMBOL found{};
     HANDLE search = Wh_FindFirstSymbol(module, &options, &found);
-    if (!search) return FALSE;
+    if (!search) {
+        Wh_SetStringValue(L"lastError", L"Cannot enumerate SystemTray.dll symbols");
+        return false;
+    }
     void* address = nullptr;
     do {
         if (wcscmp(found.symbolDecorated, L"?OnTooltipOpened@BatteryIconContent@implementation@SystemTray@winrt@@QEAAXAEBUIInspectable@Foundation@Windows@4@AEBURoutedEventArgs@Xaml@UI@74@@Z") == 0) {
@@ -262,25 +267,85 @@ BOOL Wh_ModInit() {
         }
     } while (Wh_FindNextSymbol(search, &found));
     Wh_FindCloseSymbol(search);
-    if (!address) return FALSE;
+    if (!address) {
+        Wh_SetStringValue(L"lastError", L"Battery tooltip symbol is unsupported on this Windows build");
+        return false;
+    }
+    if (!Wh_SetFunctionHook(address, reinterpret_cast<void*>(OpenedHook), reinterpret_cast<void**>(&g_originalOpened))) {
+        Wh_SetStringValue(L"lastError", L"Cannot hook the battery tooltip handler");
+        return false;
+    }
+    return true;
+}
+
+using LoadLibraryExFn = decltype(&LoadLibraryExW);
+LoadLibraryExFn g_originalLoadLibraryEx;
+
+HMODULE WINAPI LoadLibraryExHook(LPCWSTR path, HANDLE file, DWORD flags) {
+    auto module = g_originalLoadLibraryEx(path, file, flags);
+    if (!g_stopping && module && !g_hookAttempted &&
+        GetModuleHandleW(L"SystemTray.dll") == module && InstallTooltipHook(module)) {
+        if (Wh_ApplyHookOperations()) MarkHookReady();
+        else Wh_SetStringValue(L"lastError", L"Cannot apply deferred tooltip hook");
+    }
+    return module;
+}
+
+BOOL Wh_ModInit() {
+    auto taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
+    DWORD owner = 0;
+    if (taskbar) GetWindowThreadProcessId(taskbar, &owner);
+    // Ignore separate folder processes, but permit the shell's early startup.
+    if (owner && owner != GetCurrentProcessId()) return FALSE;
+    g_taskbar = taskbar;
+    ReadSettings();
+    g_restoreMessage = RegisterWindowMessageW(L"BatteryTooltip.Restore");
+    Wh_SetIntValue(L"runtimeProcessId", GetCurrentProcessId());
+    Wh_SetStringValue(L"runtimeStatus", L"waiting");
     Wh_SetStringValue(L"lastError", L"");
-    return Wh_SetFunctionHook(address, reinterpret_cast<void*>(OpenedHook), reinterpret_cast<void**>(&g_originalOpened));
+    if (!g_restoreMessage) return FALSE;
+    if (auto module = GetModuleHandleW(L"SystemTray.dll")) return InstallTooltipHook(module);
+    // Explorer may not have created its taskbar or loaded XAML yet.
+    auto kernelBase = GetModuleHandleW(L"kernelbase.dll");
+    auto loadLibrary = GetProcAddress(kernelBase, "LoadLibraryExW");
+    if (!loadLibrary || !Wh_SetFunctionHook(reinterpret_cast<void*>(loadLibrary),
+            reinterpret_cast<void*>(LoadLibraryExHook), reinterpret_cast<void**>(&g_originalLoadLibraryEx))) {
+        Wh_SetStringValue(L"lastError", L"Cannot monitor SystemTray.dll loading");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+void Wh_ModAfterInit() {
+    if (g_originalOpened) { MarkHookReady(); return; }
+    // Close the race between the initial module check and hook activation.
+    if (auto module = GetModuleHandleW(L"SystemTray.dll")) {
+        if (InstallTooltipHook(module)) {
+            if (Wh_ApplyHookOperations()) MarkHookReady();
+            else Wh_SetStringValue(L"lastError", L"Cannot apply deferred tooltip hook");
+        }
+    }
 }
 
 void Wh_ModSettingsChanged() { ReadSettings(); }
 
 void Wh_ModBeforeUninit() {
     g_stopping = true;
+    if (g_hookReady) Wh_SetStringValue(L"runtimeStatus", L"stopped");
     // Restore content synchronously on its owning thread. No delayed delegates
     // or event handlers are left behind when the DLL is unloaded.
-    DWORD thread = GetWindowThreadProcessId(g_taskbar, nullptr);
+    auto taskbar = g_taskbar.load();
+    if (!taskbar) taskbar = FindWindowW(L"Shell_TrayWnd", nullptr);
+    DWORD owner = 0;
+    DWORD thread = GetWindowThreadProcessId(taskbar, &owner);
+    if (!thread || owner != GetCurrentProcessId()) return;
     if (thread == GetCurrentThreadId()) { RestoreAll(); return; }
     HMODULE module = nullptr;
     GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                       reinterpret_cast<LPCWSTR>(RestoreHook), &module);
     auto hook = SetWindowsHookExW(WH_CALLWNDPROC, RestoreHook, module, thread);
     if (hook) {
-        SendMessageW(g_taskbar, g_restoreMessage, 0, 0);
+        SendMessageW(taskbar, g_restoreMessage, 0, 0);
         UnhookWindowsHookEx(hook);
     }
 }

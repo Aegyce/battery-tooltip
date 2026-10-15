@@ -21,25 +21,15 @@ jobs:
       - name: Test configuration writes and recovery
         shell: powershell
         run: ./tests/ConfigTests.ps1
+      - name: Test startup ownership and precompiled installation
+        shell: powershell
+        run: ./tests/InstallTests.ps1
       - name: Compile mod
         shell: pwsh
         run: python tools/build.py
       - name: Package
         shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path artifacts/package/Precompiled -Force | Out-Null
-          Copy-Item battery-tooltip.wh.cpp,README.md,LICENSE,VERSION,Setup.cmd,Start.cmd,Rollback.cmd artifacts/package
-          Copy-Item tools artifacts/package/tools -Recurse
-          Copy-Item tests artifacts/package/tests -Recurse
-          Copy-Item runtime/windhawk/AppData/Engine/Mods/64/battery-tooltip*.dll artifacts/package/Precompiled
-          $version = (Get-Content VERSION -Raw).Trim()
-          Compress-Archive -Path artifacts/package/* -DestinationPath "artifacts/BatteryTooltip-$version.zip"
-          Copy-Item battery-tooltip.wh.cpp artifacts/battery-tooltip.wh.cpp
-          $checksums = @("artifacts/BatteryTooltip-$version.zip", 'artifacts/battery-tooltip.wh.cpp') | ForEach-Object {
-            $hash = Get-FileHash -LiteralPath $_ -Algorithm SHA256
-            "$($hash.Hash.ToLowerInvariant())  $(Split-Path $_ -Leaf)"
-          }
-          $checksums | Set-Content artifacts/SHA256SUMS.txt -Encoding ascii
+        run: ./tools/Package.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: BatteryTooltip

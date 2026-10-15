@@ -1,0 +1,75 @@
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '..\tools\StartupConfig.ps1')
+. (Join-Path $PSScriptRoot '..\tools\WriteConfig.ps1')
+. (Join-Path $PSScriptRoot '..\tools\InstallPackage.ps1')
+$script:checks = 0
+function Check([bool]$Condition,[string]$Name) {
+    if (-not $Condition) { throw "FAILED: $Name" }
+    $script:checks++
+}
+$token = [Guid]::NewGuid().ToString('N')
+$registry = "HKCU:\Software\BatteryTooltip\Tests\$token"
+$fixture = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\artifacts\install-tests-$token"))
+$rootA = Join-Path $fixture 'path with spaces & symbols'
+$rootB = Join-Path $fixture 'other copy'
+try {
+    Check (-not (Set-BatteryTooltipStartup $rootA Status $registry)) 'startup initially absent'
+    Check (Set-BatteryTooltipStartup $rootA Enable $registry) 'enable startup'
+    Check (Set-BatteryTooltipStartup $rootA Enable $registry) 'repeated enable is idempotent'
+    $command = (Get-ItemProperty -LiteralPath $registry).BatteryTooltip
+    Check ($command.Contains(('"{0}"' -f (Join-Path $rootA 'tools\Start.ps1')))) 'quoted path survives spaces and metacharacters'
+    Check ($command -match '-WindowStyle Hidden.*-File .* -TimeoutSeconds 90 -Quiet$') 'hidden startup uses readiness check'
+    $failed = $false
+    try { Set-BatteryTooltipStartup $rootB Enable $registry | Out-Null } catch { $failed = $true }
+    Check ($failed -and (Get-ItemProperty -LiteralPath $registry).BatteryTooltip -eq $command) 'another directory cannot overwrite startup'
+    Check (-not (Set-BatteryTooltipStartup $rootB Disable $registry)) 'other directory has no owned startup'
+    Check ((Get-ItemProperty -LiteralPath $registry).BatteryTooltip -eq $command) 'other directory cannot remove startup'
+    Check (-not (Set-BatteryTooltipStartup $rootA Disable $registry)) 'disable removes startup'
+    Check (-not (Set-BatteryTooltipStartup $rootA Disable $registry)) 'repeated disable is safe'
+
+    $precompiled = Join-Path $rootA 'Precompiled'
+    New-Item -ItemType Directory -Path $precompiled -Force | Out-Null
+    '1.0.0' | Set-Content -LiteralPath (Join-Path $rootA 'VERSION') -Encoding ascii
+    '// fixture' | Set-Content -LiteralPath (Join-Path $rootA 'battery-tooltip.wh.cpp') -Encoding ascii
+    $names = @('battery-tooltip_1.0.0_123.dll','libc++.whl','libunwind.whl','windhawk-mod-shim.dll')
+    $entries = foreach ($name in $names) {
+        $file = Join-Path $precompiled $name
+        [IO.File]::WriteAllText($file,"fixture $name")
+        @{name=$name;sha256=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash}
+    }
+    $manifest = Join-Path $precompiled 'manifest.json'
+    @{version='1.0.0';files=@($entries)} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifest -Encoding UTF8
+    Install-BatteryTooltipPackage $rootA
+    $configPath = Join-Path $rootA 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini'
+    $text = Read-ModConfig $configPath
+    Check ($text -match 'Version=1.0.0' -and $text -match 'Disabled=1') 'new install remains disabled until started'
+    Check ($text -match 'language=auto' -and $text -match 'previewMode=0') 'fresh install uses live telemetry'
+    foreach ($name in $names) {
+        Check (Test-Path -LiteralPath (Join-Path $rootA "runtime\windhawk\AppData\Engine\Mods\64\$name")) "dependency installed: $name"
+    }
+    Write-ModConfig $configPath ($text.Replace('language=auto','language=en').Replace('chargeTargetPercent=100','chargeTargetPercent=80'))
+    Install-BatteryTooltipPackage $rootA
+    $upgraded = Read-ModConfig $configPath
+    Check ($upgraded -match 'language=en' -and $upgraded -match 'chargeTargetPercent=80') 'upgrade preserves language and charge target'
+    $fixtureTools = Join-Path $rootA 'tools'
+    New-Item -ItemType Directory -Path $fixtureTools -Force | Out-Null
+    foreach ($name in @('Start.ps1','Runtime.ps1','WriteConfig.ps1')) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "..\tools\$name") -Destination $fixtureTools
+    }
+    $failed = $false
+    try { & (Join-Path $fixtureTools 'Start.ps1') -TimeoutSeconds 1 -Quiet } catch { $failed = $true }
+    Check ($failed) 'missing runtime is reported as a failed start'
+    Check ((Get-Content -LiteralPath (Join-Path $rootA 'artifacts\startup.log') -Raw) -match 'runtime is missing') 'startup failure is recorded for diagnosis'
+    [IO.File]::WriteAllText((Join-Path $precompiled $names[0]),'tampered')
+    $failed = $false
+    try { Install-BatteryTooltipPackage $rootA } catch { $failed = $true }
+    Check ($failed -and [IO.File]::ReadAllText($configPath) -eq $upgraded) 'checksum failure leaves installed configuration intact'
+    $entries[0].name = '..\escape.dll'
+    @{version='1.0.0';files=@($entries)} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifest -Encoding UTF8
+    $failed = $false
+    try { Install-BatteryTooltipPackage $rootA } catch { $failed = $true }
+    Check ($failed) 'reject manifest path traversal'
+    Write-Host "$script:checks installation checks passed."
+} finally {
+    if (Test-Path -LiteralPath $registry) { Remove-Item -LiteralPath $registry }
+}
