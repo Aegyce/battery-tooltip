@@ -18,8 +18,7 @@ try {
     Check (Set-BatteryTooltipStartup $rootA Enable $registry) 'enable startup'
     Check (Set-BatteryTooltipStartup $rootA Enable $registry) 'repeated enable is idempotent'
     $command = (Get-ItemProperty -LiteralPath $registry).BatteryTooltip
-    Check ($command.Contains(('"{0}"' -f (Join-Path $rootA 'tools\Start.ps1')))) 'quoted path survives spaces and metacharacters'
-    Check ($command -match '-WindowStyle Hidden.*-File .* -TimeoutSeconds 90 -Quiet$') 'hidden startup uses readiness check'
+    Check ($command -eq ('"{0}" --start' -f (Join-Path $rootA 'tools\BatteryTooltip.exe'))) 'startup uses the quoted console-free launcher'
     $failed = $false
     try { Set-BatteryTooltipStartup $rootB Enable $registry | Out-Null } catch { $failed = $true }
     Check ($failed -and (Get-ItemProperty -LiteralPath $registry).BatteryTooltip -eq $command) 'another directory cannot overwrite startup'
@@ -54,7 +53,7 @@ try {
     Check ($upgraded -match 'language=en' -and $upgraded -match 'chargeTargetPercent=80') 'upgrade preserves language and charge target'
     $fixtureTools = Join-Path $rootA 'tools'
     New-Item -ItemType Directory -Path $fixtureTools -Force | Out-Null
-    foreach ($name in @('Start.ps1','Runtime.ps1','WriteConfig.ps1')) {
+    foreach ($name in @('Start.ps1','Runtime.ps1','WriteConfig.ps1','NativeProcess.ps1','NativeProcess.cs','OperationLock.ps1')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "..\tools\$name") -Destination $fixtureTools
     }
     $failed = $false
@@ -74,7 +73,8 @@ try {
     Check (Set-BatteryTooltipMenu $rootA Enable $menu) 'install manager shortcut'
     Check (@(Get-ChildItem -LiteralPath $menu -Filter '*.lnk').Count -eq 1) 'one Start menu entry covers all controls'
     $link = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $menu 'Battery Tooltip.lnk'))
-    Check ($link.Arguments.Contains(('"{0}"' -f (Join-Path $rootA 'tools\Manage.ps1'))) -and $link.Arguments -match '-STA -WindowStyle Hidden') 'manager shortcut quotes paths and hides the console'
+    Check ($link.TargetPath -eq (Join-Path $rootA 'tools\BatteryTooltip.exe') -and -not $link.Arguments) 'manager shortcut uses the GUI launcher'
+    Check ([BatteryTooltip.ShellIdentity]::GetShortcutAppId((Join-Path $menu 'Battery Tooltip.lnk')) -eq [BatteryTooltip.ShellIdentity]::AppId) 'shortcut identifies the manager independently of PowerShell'
     Check (Set-BatteryTooltipMenu $rootA Status $menu) 'manager shortcut ownership detected'
     $failed = $false
     try { Set-BatteryTooltipMenu $rootB Enable $menu | Out-Null } catch { $failed = $true }

@@ -198,50 +198,54 @@ function Get-BatteryTooltipUpdateActions {
 }
 
 function Install-BatteryTooltipPreparedUpdate([string]$ProjectRoot,[string]$JobRoot,[hashtable]$Actions = $null) {
-    $job = Assert-BatteryTooltipUpdateJob $ProjectRoot $JobRoot
-    $plan = Get-Content -LiteralPath (Join-Path $job 'plan.json') -Raw | ConvertFrom-Json
-    $payload = Join-Path $job 'payload'
-    $backup = Join-Path $job 'backup'
-    $changed = $false
-    $state = $null
+    . (Join-Path $PSScriptRoot 'OperationLock.ps1')
+    $operation = Enter-BatteryTooltipOperation $ProjectRoot
     try {
-        if (-not $Actions) { $Actions = Get-BatteryTooltipUpdateActions }
-        $state = & $Actions.State $ProjectRoot
-        if ($state.Version -ne $plan.CurrentVersion -or
-            (Get-BatteryTooltipVersion $plan.Version) -le (Get-BatteryTooltipVersion $state.Version)) { throw 'Installed version changed after checking for updates. Check again.' }
-        $oldFiles = @(Get-BatteryTooltipUpdateSnapshotFiles $ProjectRoot)
-        Copy-BatteryTooltipUpdateFiles $ProjectRoot $backup $oldFiles
-        & $Actions.Stop $ProjectRoot | Out-Null
-        $changed = $true
-        Copy-BatteryTooltipUpdateFiles $payload $ProjectRoot @(Get-BatteryTooltipPackageFiles $payload)
-        & $Actions.Install $ProjectRoot | Out-Null
-        if ($state.Running) { & $Actions.Start $ProjectRoot | Out-Null }
-        & $Actions.Preferences $ProjectRoot $state | Out-Null
-        Write-BatteryTooltipUpdateLog $ProjectRoot "Installed update $($plan.CurrentVersion) -> $($plan.Version)"
-        return $plan.Version
-    } catch {
-        $failure = $_
-        if ($changed) {
-            try {
-                & $Actions.Stop $ProjectRoot | Out-Null
-                foreach ($file in @(Get-BatteryTooltipUpdateSnapshotFiles $ProjectRoot)) {
-                    if ($file -notin $oldFiles) { Remove-Item -LiteralPath (Join-Path $ProjectRoot $file) -Force }
+        $job = Assert-BatteryTooltipUpdateJob $ProjectRoot $JobRoot
+        $plan = Get-Content -LiteralPath (Join-Path $job 'plan.json') -Raw | ConvertFrom-Json
+        $payload = Join-Path $job 'payload'
+        $backup = Join-Path $job 'backup'
+        $changed = $false
+        $state = $null
+        try {
+            if (-not $Actions) { $Actions = Get-BatteryTooltipUpdateActions }
+            $state = & $Actions.State $ProjectRoot
+            if ($state.Version -ne $plan.CurrentVersion -or
+                (Get-BatteryTooltipVersion $plan.Version) -le (Get-BatteryTooltipVersion $state.Version)) { throw 'Installed version changed after checking for updates. Check again.' }
+            $oldFiles = @(Get-BatteryTooltipUpdateSnapshotFiles $ProjectRoot)
+            Copy-BatteryTooltipUpdateFiles $ProjectRoot $backup $oldFiles
+            & $Actions.Stop $ProjectRoot | Out-Null
+            $changed = $true
+            Copy-BatteryTooltipUpdateFiles $payload $ProjectRoot @(Get-BatteryTooltipPackageFiles $payload)
+            & $Actions.Install $ProjectRoot | Out-Null
+            if ($state.Running) { & $Actions.Start $ProjectRoot | Out-Null }
+            & $Actions.Preferences $ProjectRoot $state | Out-Null
+            Write-BatteryTooltipUpdateLog $ProjectRoot "Installed update $($plan.CurrentVersion) -> $($plan.Version)"
+            return $plan.Version
+        } catch {
+            $failure = $_
+            if ($changed) {
+                try {
+                    & $Actions.Stop $ProjectRoot | Out-Null
+                    foreach ($file in @(Get-BatteryTooltipUpdateSnapshotFiles $ProjectRoot)) {
+                        if ($file -notin $oldFiles) { Remove-Item -LiteralPath (Join-Path $ProjectRoot $file) -Force }
+                    }
+                    Copy-BatteryTooltipUpdateFiles $backup $ProjectRoot $oldFiles
+                    if ($state.Running) { & $Actions.Start $ProjectRoot | Out-Null }
+                    & $Actions.Preferences $ProjectRoot $state | Out-Null
+                    Write-BatteryTooltipUpdateLog $ProjectRoot "Update failed; restored $($state.Version): $($failure.Exception.Message)"
+                } catch {
+                    $recovery = Join-Path $ProjectRoot ('artifacts\update-recovery\' + [IO.Path]::GetFileName($job))
+                    Copy-BatteryTooltipUpdateFiles $backup $recovery $oldFiles
+                    Write-BatteryTooltipUpdateLog $ProjectRoot "Automatic recovery failed: $($_.Exception.Message). Backup: $recovery"
+                    throw "Update and automatic recovery failed. Backup saved at $recovery"
                 }
-                Copy-BatteryTooltipUpdateFiles $backup $ProjectRoot $oldFiles
-                if ($state.Running) { & $Actions.Start $ProjectRoot | Out-Null }
-                & $Actions.Preferences $ProjectRoot $state | Out-Null
-                Write-BatteryTooltipUpdateLog $ProjectRoot "Update failed; restored $($state.Version): $($failure.Exception.Message)"
-            } catch {
-                $recovery = Join-Path $ProjectRoot ('artifacts\update-recovery\' + [IO.Path]::GetFileName($job))
-                Copy-BatteryTooltipUpdateFiles $backup $recovery $oldFiles
-                Write-BatteryTooltipUpdateLog $ProjectRoot "Automatic recovery failed: $($_.Exception.Message). Backup: $recovery"
-                throw "Update and automatic recovery failed. Backup saved at $recovery"
             }
+            throw $failure
+        } finally {
+            Remove-BatteryTooltipUpdateJob $ProjectRoot $job
         }
-        throw $failure
-    } finally {
-        Remove-BatteryTooltipUpdateJob $ProjectRoot $job
-    }
+    } finally { Exit-BatteryTooltipOperation $operation }
 }
 
 function New-BatteryTooltipPreparedUpdate([string]$ProjectRoot,$Plan,[scriptblock]$Download) {
@@ -260,7 +264,7 @@ function New-BatteryTooltipPreparedUpdate([string]$ProjectRoot,$Plan,[scriptbloc
         $Plan | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $job 'plan.json') -Encoding UTF8
         $worker = Join-Path $job 'worker'
         New-Item -ItemType Directory -Path $worker -Force | Out-Null
-        foreach ($name in @('Update.ps1','UpdateCore.ps1','WriteConfig.ps1','Runtime.ps1','StartupConfig.ps1','Menu.ps1','InstallPackage.ps1','Manager.strings.json')) {
+        foreach ($name in @('Update.ps1','UpdateCore.ps1','WriteConfig.ps1','Runtime.ps1','StartupConfig.ps1','NativeProcess.ps1','NativeProcess.cs','ShellIdentity.ps1','ShellIdentity.cs','Menu.ps1','InstallPackage.ps1','Manager.strings.json','OperationLock.ps1')) {
             Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $worker
         }
         Write-BatteryTooltipUpdateLog $ProjectRoot "Prepared update $($Plan.CurrentVersion) -> $($Plan.Version)"

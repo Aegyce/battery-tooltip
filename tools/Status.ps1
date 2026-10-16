@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Runtime.ps1')
 . (Join-Path $PSScriptRoot 'StartupConfig.ps1')
 . (Join-Path $PSScriptRoot 'Menu.ps1')
+. (Join-Path $PSScriptRoot 'WatchControl.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $text = Read-ModConfig (Join-Path $projectRoot 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini')
 $library = [regex]::Match($text,'(?m)^LibraryFileName=([^\r\n]+)').Groups[1].Value.Trim()
@@ -12,4 +13,6 @@ $state | Add-Member Version ([regex]::Match($text,'(?m)^Version=([^\r\n]+)').Gro
 $state | Add-Member Enabled ($text -match '(?m)^Disabled=0\r?$')
 $state | Add-Member StartupEnabled (Set-BatteryTooltipStartup $projectRoot Status)
 $state | Add-Member StartMenuInstalled (Set-BatteryTooltipMenu $projectRoot Status)
+$state | Add-Member RecoveryEnabled (-not ($text -match '(?m)^autoRecover=0\r?$'))
+$state | Add-Member RecoveryMonitorRunning (Get-BatteryTooltipWatchRunning $projectRoot)
 if ($AsJson) { $state | ConvertTo-Json } else { $state | Format-List }

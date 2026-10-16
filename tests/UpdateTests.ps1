@@ -39,6 +39,7 @@ $tools = Join-Path $payload 'tools'
 New-Item -ItemType Directory -Path $precompiled,$tools -Force | Out-Null
 '1.2.0' | Set-Content (Join-Path $payload 'VERSION') -Encoding ascii
 'new source' | Set-Content (Join-Path $payload 'battery-tooltip.wh.cpp') -Encoding ascii
+'new launcher fixture' | Set-Content (Join-Path $tools 'BatteryTooltip.exe') -Encoding ascii
 foreach ($name in @('Start.ps1','Rollback.ps1','InstallPackage.ps1','Manage.ps1','NewFeature.ps1')) {
     "# new $name" | Set-Content (Join-Path $tools $name) -Encoding ascii
 }
@@ -64,6 +65,7 @@ function New-Fixture([string]$Name) {
     New-Item -ItemType Directory -Path (Join-Path $root 'tools'),(Join-Path $root 'runtime\windhawk\AppData\Engine\Mods\64') -Force | Out-Null
     '1.1.0' | Set-Content (Join-Path $root 'VERSION') -Encoding ascii
     'old source' | Set-Content (Join-Path $root 'battery-tooltip.wh.cpp') -Encoding ascii
+    'old launcher fixture' | Set-Content (Join-Path $root 'tools\BatteryTooltip.exe') -Encoding ascii
     '# old' | Set-Content (Join-Path $root 'tools\Manage.ps1') -Encoding ascii
     'keep this user file' | Set-Content (Join-Path $root 'user.txt') -Encoding ascii
     $config = "[Mod]`nLibraryFileName=battery-tooltip_1.1.0_1.dll`nDisabled=0`nVersion=1.1.0`n[Settings]`nlanguage=zh-CN`npreviewMode=0`nchargeTargetPercent=80`n"
@@ -91,6 +93,7 @@ $job=New-BatteryTooltipPreparedUpdate $root $plan $download
 Check (Test-Path -LiteralPath (Join-Path $job $plan.PackageName)) 'download exists only inside owned staging directory'
 $installed=Install-BatteryTooltipPreparedUpdate $root $job $actions
 Check ($installed -eq '1.2.0') 'verified package installs'
+Check ((Get-Content (Join-Path $root 'tools\BatteryTooltip.exe') -Raw).Trim() -eq 'new launcher fixture') 'update installs the GUI launcher'
 $text=Read-ModConfig (Join-Path $root 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini')
 Check ($text -match 'language=zh-CN' -and $text -match 'chargeTargetPercent=80') 'update preserves user settings'
 Check (-not $script:startup -and $script:running) 'update preserves disabled startup and running state'
@@ -103,6 +106,7 @@ $script:failNewStart=$true;$script:startup=$true;$script:running=$true
 $job=New-BatteryTooltipPreparedUpdate $root $plan $download
 Reject { Install-BatteryTooltipPreparedUpdate $root $job $actions } 'failed initialization is reported'
 Check ((Get-Content (Join-Path $root 'VERSION') -Raw).Trim() -eq '1.1.0') 'failed update restores application version'
+Check ((Get-Content (Join-Path $root 'tools\BatteryTooltip.exe') -Raw).Trim() -eq 'old launcher fixture') 'failed update restores the previous GUI launcher'
 Check ((Read-ModConfig (Join-Path $root 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini')) -eq $oldConfig) 'failed update restores full mod configuration'
 Check ($script:startup -and $script:running) 'rollback restores old running and startup state'
 Check (-not (Test-Path (Join-Path $root 'tools\NewFeature.ps1'))) 'rollback removes files introduced by failed version'

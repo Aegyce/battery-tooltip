@@ -1,6 +1,8 @@
 import pathlib, subprocess, shutil, time, re, tempfile
 
 root = pathlib.Path(__file__).resolve().parent.parent
+subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+    str(root / 'tools/BuildLauncher.ps1')], check=True)
 version = (root / 'VERSION').read_text(encoding='utf-8').strip()
 source = (root / 'battery-tooltip.wh.cpp').read_text(encoding='utf-8')
 declared = re.search(r'^// @version\s+(\S+)', source, re.MULTILINE)

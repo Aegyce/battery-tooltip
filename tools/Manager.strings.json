@@ -1,6 +1,7 @@
 {
   "en": {
-    "running": "Running", "stopped": "Stopped", "starting": "Working...",
+    "running": "Running", "stopped": "Stopped", "recovering": "Recovering...", "starting": "Starting...",
+    "restarting": "Restarting...", "stopping": "Stopping...", "uninstalling": "Uninstalling...", "savingStartup": "Saving startup preference...",
     "startup": "Start automatically at sign-in", "start": "Start", "restart": "Restart",
     "stop": "Stop", "uninstall": "Uninstall", "close": "Close", "failed": "Operation failed. See artifacts/manager-error.log.",
     "update": "Check updates", "updateChecking": "Checking for updates...", "updateBusy": "An update is already being checked or installed.",
@@ -8,7 +9,8 @@
     "updateError": "Could not check or install the update. See artifacts/update.log for details."
   },
   "zh": {
-    "running": "正在运行", "stopped": "已停止", "starting": "正在处理…",
+    "running": "正在运行", "stopped": "已停止", "recovering": "正在恢复…", "starting": "正在启动…",
+    "restarting": "正在重启…", "stopping": "正在停止…", "uninstalling": "正在卸载…", "savingStartup": "正在保存自启设置…",
     "startup": "登录时自动启动", "start": "启动", "restart": "重启",
     "stop": "停止", "uninstall": "卸载", "close": "关闭", "failed": "操作失败，请查看 artifacts/manager-error.log。",
     "update": "检查更新", "updateChecking": "正在检查更新…", "updateBusy": "正在检查或安装更新，请稍候。",

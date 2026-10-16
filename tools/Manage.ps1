@@ -1,10 +1,13 @@
 param([switch]$VerifyLayout)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'ShellIdentity.ps1')
+if (-not $VerifyLayout) { [BatteryTooltip.ShellIdentity]::InitializeProcess() }
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase
 . (Join-Path $PSScriptRoot 'WriteConfig.ps1')
 . (Join-Path $PSScriptRoot 'Runtime.ps1')
 . (Join-Path $PSScriptRoot 'StartupConfig.ps1')
 . (Join-Path $PSScriptRoot 'ManagerProcess.ps1')
+. (Join-Path $PSScriptRoot 'WatchControl.ps1')
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $allStrings = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Manager.strings.json')) | ConvertFrom-Json
 $configPath = Join-Path $projectRoot 'runtime\windhawk\AppData\Engine\Mods\local@battery-tooltip.ini'
@@ -16,6 +19,13 @@ $strings = if ($chinese) { $allStrings.zh } else { $allStrings.en }
 $window = [Windows.Markup.XamlReader]::Parse([IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Manager.xaml')))
 $icon = Join-Path $projectRoot 'assets\battery-tooltip.ico'
 if (Test-Path -LiteralPath $icon) { $window.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri]::new($icon)) }
+if (-not $VerifyLayout) {
+    $window.Add_SourceInitialized({
+        $script:managerHandle = [Windows.Interop.WindowInteropHelper]::new($window).Handle
+        [BatteryTooltip.ShellIdentity]::ConfigureWindow($script:managerHandle,$projectRoot)
+    })
+    $window.Add_Closing({ [BatteryTooltip.ShellIdentity]::ClearWindow($script:managerHandle) })
+}
 $stateLabel = $window.FindName('StateLabel')
 $startupCheck = $window.FindName('StartupCheck')
 $actionButton = $window.FindName('ActionButton')
@@ -41,14 +51,15 @@ function Update-ManagerStatus {
         $version = [regex]::Match($text,'(?m)^Version=([^\r\n]+)').Groups[1].Value.Trim()
         $state = Get-BatteryTooltipRuntime $projectRoot $library
         $script:running = $state.HookReady
-        $label = if ($script:running) { $strings.running } else { $strings.stopped }
+        $recovering = -not $script:running -and (Get-BatteryTooltipWatchRunning $projectRoot)
+        $label = if ($script:running) { $strings.running } elseif ($recovering) { $strings.recovering } else { $strings.stopped }
         $stateLabel.Text = '{0} | v{1}' -f $label,$version
         $stateLabel.Foreground = if ($script:running) { [Windows.Media.Brushes]::ForestGreen } else { [Windows.Media.Brushes]::DimGray }
-        $actionButton.Content = if ($script:running) { $strings.restart } else { $strings.start }
+        $actionButton.Content = if ($script:running -or $recovering) { $strings.restart } else { $strings.start }
         $script:refreshing = $true
         $startupCheck.IsChecked = Set-BatteryTooltipStartup $projectRoot Status
         $script:refreshing = $false
-        $stopButton.IsEnabled = $script:running
+        $stopButton.IsEnabled = $script:running -or $recovering
         if (-not $script:running -and $state.LastError) {
             $errorLabel.Text = $state.LastError
             $errorLabel.Visibility = 'Visible'
@@ -66,7 +77,13 @@ function Start-ManagerOperation([string]$ScriptName,[string]$Arguments = '',[boo
         $script:operation = Start-BatteryTooltipManagerProcess (Join-Path $PSScriptRoot $ScriptName) $Arguments $logDirectory
         $script:closeAfterOperation = $CloseAfter
         foreach ($control in @($startupCheck,$actionButton,$stopButton,$uninstallButton,$updateButton)) { $control.IsEnabled = $false }
-        $stateLabel.Text = if ($ScriptName -eq 'Update.ps1') { $strings.updateChecking } else { $strings.starting }
+        $stateLabel.Text = switch ($ScriptName) {
+            'Update.ps1' { $strings.updateChecking }
+            'Startup.ps1' { $strings.savingStartup }
+            'Rollback.ps1' { $strings.stopping }
+            'Uninstall.ps1' { $strings.uninstalling }
+            default { if ($actionButton.Content -eq $strings.restart) { $strings.restarting } else { $strings.starting } }
+        }
         $errorLabel.Visibility = 'Collapsed'
     } catch {
         $errorLabel.Text = $_.Exception.Message
@@ -103,8 +120,10 @@ $timer.Add_Tick({
     Update-ManagerStatus
 })
 $window.Add_Closed({ $timer.Stop() })
-Update-ManagerStatus
 if ($VerifyLayout) {
+    $version = [regex]::Match($config,'(?m)^Version=([^\r\n]+)').Groups[1].Value.Trim()
+    $stateLabel.Text = '{0} | v{1}' -f $strings.stopped,$version
+    $actionButton.Content = $strings.start
     $content = $window.Content
     $content.Measure([Windows.Size]::new(292,[double]::PositiveInfinity))
     $size = [Windows.Size]::new(292,$content.DesiredSize.Height)
@@ -119,6 +138,7 @@ if ($VerifyLayout) {
     try { $encoder.Save($stream) } finally { $stream.Dispose() }
     Write-Host "Manager content: $($size.Width) x $($size.Height). Saved $path"
 } else {
+    Update-ManagerStatus
     $timer.Start()
     $window.ShowDialog() | Out-Null
 }

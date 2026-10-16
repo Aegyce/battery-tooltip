@@ -4,7 +4,7 @@
 
 A Windhawk mod for Windows 11 that shows battery charging and discharging power and estimated remaining time in the native battery icon tooltip.
 
-Stable release: **1.2.0**. GitHub repository name: **battery-tooltip**.
+Current version: **1.3.1**. GitHub repository name: **battery-tooltip**.
 
 The mod keeps the existing battery icon, taskbar percentage, and click behavior. It adds no battery tray icon. English and Simplified Chinese are supported, with `W`, `h`, and `min` units. Language follows Windows by default; other Windows languages fall back to English.
 
@@ -73,14 +73,14 @@ Reopen the tooltip to apply the language change. Both languages use the same tel
 
 ## Install, start, and stop
 
-1. Download `BatteryTooltip-1.2.0.zip` from [GitHub Releases](https://github.com/Aegyce/battery-tooltip/releases/latest), extract it to a permanent directory, and run `Install.cmd` (or `Setup.cmd`). The package includes the compiled mod and dependencies; Python is not required. Setup downloads and verifies the official Windhawk 1.7.3 offline installer and extracts the portable runtime.
+1. Download `BatteryTooltip-1.3.1.zip` from [GitHub Releases](https://github.com/Aegyce/battery-tooltip/releases/latest), extract it to a permanent directory, and run `Install.cmd` (or `Setup.cmd`). The package includes the compiled mod, GUI launcher, and dependencies; Python is not required. Setup downloads and verifies the official Windhawk 1.7.3 offline installer and extracts the portable runtime.
 2. Installation starts the mod, verifies that its tooltip hook is ready, and enables automatic startup for the current Windows user. Hover over the existing battery icon. Keep the installation directory in place.
-3. Search the Start menu for **Battery Tooltip** (or run `Manage.cmd`). One compact window shows running status, a sign-in startup checkbox, and Start/Restart, Stop, Uninstall, and Close buttons. Restart and Stop preserve the automatic-startup preference. Close dismisses only the manager; the tooltip keeps running. The window is 308 logical pixels wide, with an 8-pixel margin and 4-pixel button spacing. Its application icon is also used for the single Start menu entry.
+3. Search the Start menu for **Battery Tooltip** (or run `Manage.cmd`). One compact window shows running status, a sign-in startup checkbox, and Start/Restart, Stop, Uninstall, and Close buttons. Restart and Stop preserve the automatic-startup preference. Close dismisses only the manager; the tooltip keeps running. The window is 308 logical pixels wide, with an 8-pixel margin and 4-pixel button spacing. Its application icon is used for the Start menu entry and taskbar button, which appears when the manager opens. Taskbar pinning and relaunching open Battery Tooltip.
 4. Uninstall from that window (or run `Uninstall.cmd`) to stop the mod and remove this installation's startup and Start menu entry. `Rollback.cmd` stops the mod and removes startup while keeping the manager available. Both verify DLL unloading and restore saved native tooltip content. A failed stop produces an error instead of reporting success.
 
 For scripts, `Status.cmd` reports version, loading, hook readiness, startup, and menu registration. `Start.cmd` and `Restart.cmd` control the runtime without changing the startup preference.
 
-Logs stay in the installation directory: `artifacts/manager-output.log` records manager operations, `artifacts/manager-error.log` records their error output, and `artifacts/startup.log` records startup failures.
+Logs stay in the installation directory: `artifacts/manager-output.log` records manager operations, `artifacts/manager-error.log` records their error output, `artifacts/startup.log` records startup failures, `artifacts/runtime.log` records successful starts, and `artifacts/launcher.log` records launcher failures.
 
 To install without automatic startup, run `Install.cmd -NoAutoStart`. To prepare a package without starting it, add `-NoStart`. Enable or disable automatic startup independently with:
 
@@ -90,7 +90,12 @@ To install without automatic startup, run `Install.cmd -NoAutoStart`. To prepare
 & .\tools\Startup.ps1 -Mode Status
 ```
 
-Automatic startup waits up to 90 seconds for the taskbar and native tooltip hook. Startup failures are written to `artifacts/startup.log`; a failed launch is not reported as successful. Initialization supports Explorer starting before `SystemTray.dll` loads. A normal sleep/hibernate resume keeps the existing process; it does not require a separate scheduled task.
+The manager uses a GUI launcher that creates no PowerShell console window. The launcher and Windhawk start through the Windows desktop so a temporary launching task cannot terminate the background runtime when that task ends.
+Startup registration is read and written from a desktop-launched process so isolated launching environments cannot report a private registry entry as a working sign-in entry.
+
+Automatic startup waits for the desktop, then allows up to 90 seconds for the taskbar and native tooltip hook. Startup failures are written to `artifacts/startup.log`; a failed launch is not reported as successful. Initialization supports Explorer starting before `SystemTray.dll` loads.
+
+A hidden recovery monitor checks the private runtime while the tooltip is enabled and rechecks after sleep/hibernate resume, including automatic wake before any user activation. It records process exits and exit codes, restarts an exited runtime, and gives an unavailable hook 90 seconds to initialize before restarting Windhawk. Recovery is limited to three attempts per ten minutes. Manual Stop and Uninstall stop the monitor before completing. An unreadable configuration suspends recovery. To opt out, set `autoRecover=0` under `[Settings]` in the mod INI and restart; omit it or use `1` to enable recovery. Monitor logs rotate at 1 MiB in `artifacts/runtime-watch.log`.
 
 Install over an existing directory to upgrade; the old module is stopped first and existing language, preview, and charge-target settings are preserved. Disable startup before moving the directory, then install from its new location.
 
@@ -137,6 +142,11 @@ python tools/test.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/ConfigTests.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/InstallTests.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/ManagerProcessTests.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/NativeProcessTests.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/RecoveryPolicyTests.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/OperationLockTests.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/BuildLauncher.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tests/WatchTests.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/UpdateTests.ps1
 python tools/build.py
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Package.ps1

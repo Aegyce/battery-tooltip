@@ -27,6 +27,27 @@ jobs:
       - name: Test manager operation results and logs
         shell: powershell
         run: ./tests/ManagerProcessTests.ps1
+      - name: Test manager taskbar identity, icon, and relaunch properties
+        shell: powershell
+        run: powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File tests/ShellIdentityTests.ps1
+      - name: Test independent background lifetime and console-free startup
+        shell: powershell
+        run: ./tests/NativeProcessTests.ps1
+      - name: Test resume recovery, manual stops, and bounded retries
+        shell: powershell
+        run: ./tests/RecoveryPolicyTests.ps1
+      - name: Test automatic and interactive native resume notifications
+        shell: powershell
+        run: powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File tests/PowerNotificationTests.ps1
+      - name: Test conflicting and nested runtime operations
+        shell: powershell
+        run: ./tests/OperationLockTests.ps1
+      - name: Compile console-free launcher
+        shell: powershell
+        run: ./tools/BuildLauncher.ps1
+      - name: Test monitor lifetime, singleton, invalid config, and opt-out
+        shell: powershell
+        run: ./tests/WatchTests.ps1
       - name: Test update verification, rollback, and cleanup
         shell: powershell
         run: ./tests/UpdateTests.ps1

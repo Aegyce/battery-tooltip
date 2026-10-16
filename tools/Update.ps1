@@ -85,8 +85,7 @@ public static class BatteryTooltipUpdateWindow {
     if ($locked) { $mutex.ReleaseMutex() }
     $mutex.Dispose()
     if ($Mode -eq 'Apply') {
-        $shell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-        Start-Process -FilePath $shell -ArgumentList ('-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}"' -f (Join-Path $ProjectRoot 'tools\Manage.ps1')) -WindowStyle Hidden
+        Start-Process -FilePath (Join-Path $ProjectRoot 'tools\BatteryTooltip.exe') -WindowStyle Hidden
     }
 }
 if ($errorOccurred) { [Windows.MessageBox]::Show($strings.updateError,'Battery Tooltip',[Windows.MessageBoxButton]::OK,[Windows.MessageBoxImage]::Error) | Out-Null }
